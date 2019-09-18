@@ -1,6 +1,11 @@
 import cv2
 import os
 import numpy as np
+import pyocr
+import pyocr.builders
+import pandas as pd
+import re
+import sys
 
 # Set Working Directory
 wdpath = '/Users/jenspedermeldgaard/Google Drive/CS/PythonProjects/OCR/'
@@ -16,7 +21,8 @@ files = os.listdir(inputDirectory)
 files = [str.lower(f) for f in files]
 files = [f for f in files if f.endswith(allowedExtensions)]
 
-image = cv2.imread(inputDirectory + files[2])
+image = cv2.imread(inputDirectory + files[11])
+rescalingFactor = 800/image.shape[0] * 100
 
 
 def downScaleImage(srcImage, percent):
@@ -54,15 +60,19 @@ def applyCannySquareEdgeDetectionOnImage(srcImage, percent):
     destImage = downScaleImage(srcImage, percent)
     # Convert to Grayscale
     grayImage = cv2.cvtColor(destImage, cv2.COLOR_BGR2GRAY)
+
     # Add Gaussian Blur
+
     destImage = cv2.GaussianBlur(
-        grayImage, (5, 5), 0, 0, borderType=cv2.BORDER_DEFAULT)
+        grayImage, (9, 9), 0, 0, borderType=cv2.BORDER_DEFAULT)
+    destImage = cv2.bilateralFilter(destImage, 11, 150, 150)
+    destImage = cv2.threshold(destImage, 127, 255, cv2.THRESH_BINARY)[1]
     # Clean Image for better Detection
     kernel = np.ones((5, 5), np.uint8)
-    destImage = cv2.erode(destImage, kernel, iterations=1)
+    destImage = cv2.erode(grayImage, kernel, iterations=1)
     destImage = cv2.dilate(destImage, kernel, iterations=1)
     # Apply Canny Edge Detection
-    destImage = cv2.Canny(destImage, 75, 200)
+    destImage = cv2.Canny(destImage, 75, 200, L2gradient=True)
     return destImage
 
 
@@ -97,7 +107,7 @@ def findLargestSquareOnCannyDetectedImage(edgedImage):
             seqFound = contour
 
     # Outline polygon of largest Contour
-    epsilon = cv2.arcLength(seqFound, True) * 0.02
+    epsilon = cv2.arcLength(seqFound, True) * 0.05
     result = cv2.approxPolyDP(seqFound, epsilon, True)
     return result
 
@@ -228,6 +238,9 @@ def addPaddingToImage(srcImage, paddingSize):
     br, gr, rr, _ = cv2.mean(right)
     bl, gl, rl, _ = cv2.mean(left)
     b, g, r = (np.mean((br, bl)), np.mean((gr, gl)), np.mean((rr, rl)))
+
+    if (b > 200) & (g > 200) & (r > 200):
+        b, g, r = (0, 0, 0)
     destImage = cv2.copyMakeBorder(
         src=destImage,
         top=paddingSize,
@@ -240,10 +253,79 @@ def addPaddingToImage(srcImage, paddingSize):
     return destImage
 
 
+def pullPurchaseInfo(string):
+    """
+    ### Description:
+        Extract purchase information from string basex from Regex.
+
+    ### Arguments:
+        string {[String]} -- String with potential purchase information.
+
+    ### Returns:
+        [Dict] -- Dictionary with item description and price
+    """
+    s = re.search(r'(\S+\ \S+|)(\S+\ )(\d+(,|\.)\d\d)', string)
+    if (s is None):
+        return None
+
+    item = re.search(r'(\S+\ \S+|)(\S+\ )', string).group()
+    item = re.sub(' ', '', item)
+    price = re.search(r'(\d+(,|\.)\d\d)', string).group()
+    price = re.sub(r'\.', '', price)
+    price = re.sub(r',', '.', price)
+    Dict = eval("{" +
+                "'desc' : '" + item + "'," +
+                "'price' : " + price + '}')
+    return Dict
+
+
+def ocrCore(srcImage, language):
+    """
+    ### Description:
+        Perform OCR on srcImage in a given language.
+
+    ### Arguments:
+        srcImage {[cv2.Image]} -- Image loaded by cv2.imread()
+        language {[String]} -- String indicating the language to be used for OCR
+
+    ### Returns:
+        [pandas.DataFrame] -- DataFrame with item description and price
+    """
+    tools = pyocr.get_available_tools()
+    if len(tools) == 0:
+        print("No OCR tool found")
+        sys.exit(1)
+    # The tools are returned in the recommended order of usage
+    tool = tools[0]
+    print("Will use tool '%s'" % (tool.get_name()))
+
+    lang = language
+    print("Will use lang '%s'" % (lang))
+
+    # list of line objects. For each line object:
+    #   line.word_boxes is a list of word boxes (the individual words in the line)
+    #   line.content is the whole text of the line
+    #   line.position is the position of the whole line on the page (in pixels)
+    line_and_word_boxes = tool.image_to_string(
+        srcImage, lang="dan",
+        builder=pyocr.builders.LineBoxBuilder()
+    )
+    df = pd.DataFrame(columns=('desc', 'price'))
+    for line in line_and_word_boxes:
+        print(line.content)
+        txt = pullPurchaseInfo(line.content)
+        if txt is None:
+            continue
+        else:
+            df = df.append(txt, ignore_index=True)
+
+    return df
+
+
 paddedImage = addPaddingToImage(image, 100)
-canImage = applyCannySquareEdgeDetectionOnImage(paddedImage, 20)
+canImage = applyCannySquareEdgeDetectionOnImage(paddedImage, rescalingFactor)
 approx = findLargestSquareOnCannyDetectedImage(canImage)
-warpImage = getBirdView(paddedImage, approx, 20)
+warpImage = getBirdView(paddedImage, approx, rescalingFactor)
 cleanImage = cleanImageForOCR(warpImage)
 
 

@@ -157,3 +157,6 @@ def addPaddingToImage(srcImage, paddingSize):
 
 
 # %%
+int(1024/1480*100)
+
+# %%
