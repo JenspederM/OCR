@@ -6,6 +6,7 @@ import pyocr.builders
 import pandas as pd
 import re
 import sys
+from PIL import Image
 
 # Set Working Directory
 wdpath = '/Users/jenspedermeldgaard/Google Drive/CS/PythonProjects/OCR/'
@@ -21,7 +22,7 @@ files = os.listdir(inputDirectory)
 files = [str.lower(f) for f in files]
 files = [f for f in files if f.endswith(allowedExtensions)]
 
-image = cv2.imread(inputDirectory + files[11])
+image = cv2.imread(inputDirectory + files[2])
 rescalingFactor = 800/image.shape[0] * 100
 
 
@@ -286,11 +287,16 @@ def ocrCore(srcImage, language):
 
     ### Arguments:
         srcImage {[cv2.Image]} -- Image loaded by cv2.imread()
-        language {[String]} -- String indicating the language to be used for OCR
+        language {[String]} -- Indication of the language to be used for OCR
 
     ### Returns:
         [pandas.DataFrame] -- DataFrame with item description and price
     """
+
+    destImage = srcImage.copy()
+    destImage = cv2.cvtColor(destImage, cv2.COLOR_BGR2RGB)
+    destImage = Image.fromarray(destImage)
+
     tools = pyocr.get_available_tools()
     if len(tools) == 0:
         print("No OCR tool found")
@@ -303,11 +309,11 @@ def ocrCore(srcImage, language):
     print("Will use lang '%s'" % (lang))
 
     # list of line objects. For each line object:
-    #   line.word_boxes is a list of word boxes (the individual words in the line)
+    #   line.word_boxes is a list of word boxes (individual words in the line)
     #   line.content is the whole text of the line
     #   line.position is the position of the whole line on the page (in pixels)
     line_and_word_boxes = tool.image_to_string(
-        srcImage, lang="dan",
+        destImage, lang="dan",
         builder=pyocr.builders.LineBoxBuilder()
     )
     df = pd.DataFrame(columns=('desc', 'price'))
@@ -327,6 +333,7 @@ canImage = applyCannySquareEdgeDetectionOnImage(paddedImage, rescalingFactor)
 approx = findLargestSquareOnCannyDetectedImage(canImage)
 warpImage = getBirdView(paddedImage, approx, rescalingFactor)
 cleanImage = cleanImageForOCR(warpImage)
+test = ocrCore(cleanImage, "dan")
 
 
 cv2.drawContours(canImage, [approx], -1, (255, 255, 255), 3)
@@ -336,3 +343,5 @@ cv2.imshow("Clean", cleanImage)
 cv2.imshow("Padded", paddedImage)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
+
+print(test)
