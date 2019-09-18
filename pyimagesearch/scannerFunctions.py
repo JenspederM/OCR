@@ -10,7 +10,7 @@ from PIL import Image
 
 
 def ocrInterface(imageFilePath, heightScaleFactor, ocrLanguage,
-                 showImages, printLines):
+                 printResult, showImages, printOcrLines):
     """
     ### Description:
         Performs Optical Character Recognition (OCR) on an image.
@@ -19,6 +19,7 @@ def ocrInterface(imageFilePath, heightScaleFactor, ocrLanguage,
         imageFilePath {[String]} -- Filepath where from image is loaded.
         heightScaleFactor {[int]} -- Value that determine image height
         ocrLanguage {[String]} -- Language in which to perform OCR
+        printResult {[boolean]} -- Should OCR result be printed?
         showImages {[boolean]} -- Should intermediate images be shown?
         printLines {[boolean]} -- Should each recognized line be printed?
 
@@ -34,7 +35,7 @@ def ocrInterface(imageFilePath, heightScaleFactor, ocrLanguage,
     ROI = findLargestSquareOnCannyDetectedImage(canImage)
     warpImage = getBirdView(paddedImage, ROI, rescalingFactor)
     cleanImage = cleanImageForOCR(warpImage)
-    ocrResult = ocrEngine(cleanImage, ocrLanguage, printLines)
+    ocrResult = ocrEngine(cleanImage, ocrLanguage, printOcrLines)
 
     if showImages:
         cv2.drawContours(canImage, [ROI], -1, (255, 255, 255), 3)
@@ -45,7 +46,10 @@ def ocrInterface(imageFilePath, heightScaleFactor, ocrLanguage,
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    print(ocrResult)
+    if printResult:
+        print(ocrResult)
+
+    return ocrResult
 
 
 def downScaleImage(srcImage, percent):
@@ -358,12 +362,15 @@ wdpath = '/Users/jenspedermeldgaard/Google Drive/CS/PythonProjects/OCR/'
 inputDirectory = wdpath + 'images/'
 outputDirectory = wdpath + 'out/'
 allowedExtensions = tuple(('.jpg', '.jpeg', '.png'))
-acceptedLineStarts = tuple(('total', 'dankort', 'atbetale', 'kortbetaling'))
 
 # Pull File Details
 files = os.listdir(inputDirectory)
 files = [str.lower(f) for f in files]
 files = [f for f in files if f.endswith(allowedExtensions)]
 
-filePath = inputDirectory + files[2]
-ocrInterface(filePath, 800, "dan", False, True)
+for f in files:
+    inPath = inputDirectory + f
+    result = ocrInterface(inPath, 800, "dan", False, False, False)
+    outPath = outputDirectory + \
+        os.path.splitext(os.path.basename(f))[0] + ".csv"
+    result.to_csv(outPath, index=None, header=True)
