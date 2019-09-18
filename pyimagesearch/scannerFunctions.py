@@ -369,6 +369,7 @@ files = [str.lower(f) for f in files]
 files = [f for f in files if f.endswith(allowedExtensions)]
 
 for f in files:
+    print("\n\nInitiating OCR on file " + f + "...")
     inPath = inputDirectory + f
     result = ocrInterface(inPath, 800, "dan", False, False, False)
     outPath = outputDirectory + \
