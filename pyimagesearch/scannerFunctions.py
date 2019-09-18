@@ -20,6 +20,17 @@ image = cv2.imread(inputDirectory + files[2])
 
 
 def downScaleImage(srcImage, percent):
+    """
+    ### Description:
+        Scale srcImage according to percent
+
+    ### Arguments:
+        srcImage {[cv2.Image]} -- Image loaded by cv2.imread()
+        percent {[int]} -- Rescaling factor (for faster computation)
+
+    ### Returns:
+        [cv2.Image] -- Rescaled image
+    """
     print("srcImage - Height - ",
           srcImage.shape[0], ", width - ", srcImage.shape[1])
     destImage = cv2.resize(srcImage, None, fx=percent/100, fy=percent/100)
@@ -29,6 +40,17 @@ def downScaleImage(srcImage, percent):
 
 
 def applyCannySquareEdgeDetectionOnImage(srcImage, percent):
+    """
+    ### Description:
+        Applies Canny edge detection algorithm on srcImage.
+
+    ### Arguments:
+        srcImage {[cv2.Image]} -- Image loaded by cv2.imread()
+        percent {[int]} -- Rescaling factor (for faster computation)
+
+    ### Returns:
+        [cv2.Image] -- Image with edges detected by Canny
+    """
     destImage = downScaleImage(srcImage, percent)
     # Convert to Grayscale
     grayImage = cv2.cvtColor(destImage, cv2.COLOR_BGR2GRAY)
@@ -44,8 +66,19 @@ def applyCannySquareEdgeDetectionOnImage(srcImage, percent):
     return destImage
 
 
-def findLargestSquareOnCannyDetectedImage(cannyEdgeDetectedImage):
-    foundContourImage = cannyEdgeDetectedImage.copy()
+def findLargestSquareOnCannyDetectedImage(edgedImage):
+    """
+    ### Description:
+        Finds largest contour on edged image, which have been processed
+        by an appropriate edging algorithm, e.g. Canny.
+
+    ### Arguments:
+        edgedImage {[cv2.Image]} -- Preprocessed image by e.g. cv2.Canny()
+
+    ### Returns:
+        [np.array] -- Region Of Interest from edged image
+    """
+    foundContourImage = edgedImage.copy()
     contours, hierarchy = cv2.findContours(
         foundContourImage, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -69,13 +102,22 @@ def findLargestSquareOnCannyDetectedImage(cannyEdgeDetectedImage):
     return result
 
 
-def orderLargestSquare(largeSquare):
-    # initialzie a list of coordinates that will be ordered
-    # such that the first entry in the list is the top-left,
-    # the second entry is the top-right, the third is the
-    # bottom-right, and the fourth is the bottom-left
+def orderLargestSquare(ROI):
+    """
+    ### Description:
+        Initialzie a list of coordinates that will be ordered
+        such that the first entry in the list is the top-left,
+        the second entry is the top-right, the third is the
+        bottom-right, and the fourth is the bottom-left
+
+    ### Arguments:
+        ROI {[np.array]} -- ROI obtained through cv2.approxPolyDP()
+
+    ### Returns:
+        [np.array[4, 2]] -- Rearranged ROI
+    """
     rect = np.zeros((4, 2), dtype="float32")
-    pts = largeSquare.reshape(largeSquare.shape[0], largeSquare.shape[2])
+    pts = ROI.reshape(ROI.shape[0], ROI.shape[2])
 
     # the top-left point will have the smallest sum, whereas
     # the bottom-right point will have the largest sum
@@ -94,10 +136,23 @@ def orderLargestSquare(largeSquare):
     return rect
 
 
-def getBirdView(image, pts, percent):
+def getBirdView(srcImage, ROI, percent):
+    """
+    ### Description:
+        Rearrange image to fit region of interest (ROI) and return
+        an image warped to birds eye view.
+
+    ### Arguments:
+        srcImage {[cv2.Image]} -- Image loaded by cv2.imread()
+        ROI {[np.array]} -- ROI obtained through cv2.approxPolyDP()
+        percent {[int]} -- Rescaling factor (for faster computation)
+
+    ### Returns:
+        [cv2.Image] -- ROI of srcImage as seen from birds eye view
+    """
     # obtain a consistent order of the points and unpack them
     # individually
-    rect = orderLargestSquare(pts)
+    rect = orderLargestSquare(ROI)
     rect = (rect*100)/percent
     (tl, tr, br, bl) = rect
 
@@ -128,20 +183,22 @@ def getBirdView(image, pts, percent):
 
     # compute the perspective transform matrix and then apply it
     M = cv2.getPerspectiveTransform(rect, dst)
-    warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
+    warped = cv2.warpPerspective(srcImage, M, (maxWidth, maxHeight))
 
     # return the warped image
     return warped
 
 
 def cleanImageForOCR(srcImage):
-    """Cleans an Image by applying grayscale, medianblur,
-     and otsu threshold prior to OCR
+    """
+    ### Description
+        Cleans an Image by applying grayscale, medianblur,
+        and otsu threshold prior to OCR
 
-    Arguments:
+    ### Arguments:
         srcImage {[cv2.Image]} -- Image loaded by cv2.imread()
 
-    Returns:
+    ### Returns:
         destImage [cv2.Image] -- A clean image
     """
     destImage = srcImage.copy()
@@ -152,16 +209,16 @@ def cleanImageForOCR(srcImage):
 
 
 def addPaddingToImage(srcImage, paddingSize):
-    """Adds padding around an image corresponding to the average
-    RGB values of both left and right sides
+    """
+    ### Description:
+        Adds padding around an image corresponding to the average
+        RGB values of both left and right sides
 
-    Arguments: {
-        srcImage {[cv2.Image]} -- Image loaded by cv2.imread(),
+    ### Arguments:
+        srcImage {[cv2.Image]} -- Image loaded by cv2.imread()
         paddingSize {[int]} -- Determines size of padding in Pixels
-    }
 
-
-    Returns: \n
+    ### Returns:
         [cv2.Image] -- srcImage with padding on all sides
     """
     destImage = srcImage.copy()
