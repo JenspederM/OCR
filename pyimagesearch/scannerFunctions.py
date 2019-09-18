@@ -8,22 +8,44 @@ import re
 import sys
 from PIL import Image
 
-# Set Working Directory
-wdpath = '/Users/jenspedermeldgaard/Google Drive/CS/PythonProjects/OCR/'
 
-# Set IO Parameters
-inputDirectory = wdpath + 'images/'
-outputDirectory = wdpath + 'out/'
-allowedExtensions = tuple(('.jpg', '.jpeg', '.png'))
-acceptedLineStarts = tuple(('total', 'dankort', 'atbetale', 'kortbetaling'))
+def ocrInterface(imageFilePath, heightScaleFactor, ocrLanguage,
+                 showImages, printLines):
+    """
+    ### Description:
+        Performs Optical Character Recognition (OCR) on an image.
 
-# Pull File Details
-files = os.listdir(inputDirectory)
-files = [str.lower(f) for f in files]
-files = [f for f in files if f.endswith(allowedExtensions)]
+    ### Arguments:
+        imageFilePath {[String]} -- Filepath where from image is loaded.
+        heightScaleFactor {[int]} -- Value that determine image height
+        ocrLanguage {[String]} -- Language in which to perform OCR
+        showImages {[boolean]} -- Should intermediate images be shown?
+        printLines {[boolean]} -- Should each recognized line be printed?
 
-image = cv2.imread(inputDirectory + files[2])
-rescalingFactor = 800/image.shape[0] * 100
+    ### Returns:
+        [pandas.DataFrame] -- DataFrame where each row represents a
+        purchased item.
+    """
+    image = cv2.imread(imageFilePath)
+    rescalingFactor = heightScaleFactor/image.shape[0] * 100
+    paddedImage = addPaddingToImage(image, 100)
+    canImage = applyCannySquareEdgeDetectionOnImage(
+        paddedImage, rescalingFactor)
+    ROI = findLargestSquareOnCannyDetectedImage(canImage)
+    warpImage = getBirdView(paddedImage, ROI, rescalingFactor)
+    cleanImage = cleanImageForOCR(warpImage)
+    ocrResult = ocrEngine(cleanImage, ocrLanguage, printLines)
+
+    if showImages:
+        cv2.drawContours(canImage, [ROI], -1, (255, 255, 255), 3)
+        cv2.imshow("Canny Edge", canImage)
+        cv2.imshow("Warped", warpImage)
+        cv2.imshow("Clean", cleanImage)
+        cv2.imshow("Padded", paddedImage)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    print(ocrResult)
 
 
 def downScaleImage(srcImage, percent):
@@ -280,7 +302,7 @@ def pullPurchaseInfo(string):
     return Dict
 
 
-def ocrCore(srcImage, language):
+def ocrEngine(srcImage, language, printOutput):
     """
     ### Description:
         Perform OCR on srcImage in a given language.
@@ -288,6 +310,7 @@ def ocrCore(srcImage, language):
     ### Arguments:
         srcImage {[cv2.Image]} -- Image loaded by cv2.imread()
         language {[String]} -- Indication of the language to be used for OCR
+        printOutput {[boolean]} -- Should output be printed?
 
     ### Returns:
         [pandas.DataFrame] -- DataFrame with item description and price
@@ -304,21 +327,21 @@ def ocrCore(srcImage, language):
     # The tools are returned in the recommended order of usage
     tool = tools[0]
     print("Will use tool '%s'" % (tool.get_name()))
-
-    lang = language
-    print("Will use lang '%s'" % (lang))
+    print("Will use lang '%s'" % (language))
 
     # list of line objects. For each line object:
     #   line.word_boxes is a list of word boxes (individual words in the line)
     #   line.content is the whole text of the line
     #   line.position is the position of the whole line on the page (in pixels)
     line_and_word_boxes = tool.image_to_string(
-        destImage, lang="dan",
+        destImage, lang=language,
         builder=pyocr.builders.LineBoxBuilder()
     )
     df = pd.DataFrame(columns=('desc', 'price'))
     for line in line_and_word_boxes:
-        print(line.content)
+        if printOutput:
+            print(line.content)
+
         txt = pullPurchaseInfo(line.content)
         if txt is None:
             continue
@@ -328,20 +351,19 @@ def ocrCore(srcImage, language):
     return df
 
 
-paddedImage = addPaddingToImage(image, 100)
-canImage = applyCannySquareEdgeDetectionOnImage(paddedImage, rescalingFactor)
-approx = findLargestSquareOnCannyDetectedImage(canImage)
-warpImage = getBirdView(paddedImage, approx, rescalingFactor)
-cleanImage = cleanImageForOCR(warpImage)
-test = ocrCore(cleanImage, "dan")
+# Set Working Directory
+wdpath = '/Users/jenspedermeldgaard/Google Drive/CS/PythonProjects/OCR/'
 
+# Set IO Parameters
+inputDirectory = wdpath + 'images/'
+outputDirectory = wdpath + 'out/'
+allowedExtensions = tuple(('.jpg', '.jpeg', '.png'))
+acceptedLineStarts = tuple(('total', 'dankort', 'atbetale', 'kortbetaling'))
 
-cv2.drawContours(canImage, [approx], -1, (255, 255, 255), 3)
-cv2.imshow("Canny Edge", canImage)
-cv2.imshow("Warped", warpImage)
-cv2.imshow("Clean", cleanImage)
-cv2.imshow("Padded", paddedImage)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+# Pull File Details
+files = os.listdir(inputDirectory)
+files = [str.lower(f) for f in files]
+files = [f for f in files if f.endswith(allowedExtensions)]
 
-print(test)
+filePath = inputDirectory + files[2]
+ocrInterface(filePath, 800, "dan", False, True)
