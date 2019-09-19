@@ -123,11 +123,10 @@ def applyCannySquareEdgeDetectionOnImage(srcImage, percent):
     destImage = downScaleImage(srcImage, percent)
     # Convert to Grayscale
     grayImage = cv2.cvtColor(destImage, cv2.COLOR_BGR2GRAY)
-
     # Add Gaussian Blur
-
     destImage = cv2.GaussianBlur(
         grayImage, (9, 9), 0, 0, borderType=cv2.BORDER_DEFAULT)
+    # Add Filter and Threshold
     destImage = cv2.bilateralFilter(destImage, 11, 150, 150)
     destImage = cv2.threshold(destImage, 127, 255, cv2.THRESH_BINARY)[1]
     # Clean Image for better Detection
@@ -152,7 +151,7 @@ def findLargestSquareOnCannyDetectedImage(edgedImage):
         [np.array] -- Region Of Interest from edged image
     """
     foundContourImage = edgedImage.copy()
-    contours, hierarchy = cv2.findContours(
+    contours, _ = cv2.findContours(
         foundContourImage, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     # Isolate largest Contour
