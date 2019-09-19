@@ -7,10 +7,21 @@ import pandas as pd
 import re
 import sys
 from PIL import Image
+from wand.image import Image as Img
+
+
+def convertPDFtoJPG(convertImageFilePath):
+    fileDetails = os.path.split(convertImageFilePath)
+    filePath = fileDetails[0]
+    fileName = os.path.splitext(fileDetails[1])[0]
+    with Img(filename=convertImageFilePath, resolution=300) as img:
+        img.compression_quality = 99
+        img.save(filename=filePath+fileName+".jpg")
+    return cv2.imread(filePath+fileName+".jpg")
 
 
 def ocrInterface(imageFilePath, heightScaleFactor, ocrLanguage,
-                 printResult, showImages, printOcrLines):
+                 printResult=False, showImages=False, printOcrLines=False):
     """
     ### Description:
         Performs Optical Character Recognition (OCR) on an image.
@@ -27,7 +38,14 @@ def ocrInterface(imageFilePath, heightScaleFactor, ocrLanguage,
         [pandas.DataFrame] -- DataFrame where each row represents a
         purchased item.
     """
-    image = cv2.imread(imageFilePath)
+    fileExtension = os.path.splitext(
+        os.path.basename(imageFilePath))[1].lower()
+
+    if fileExtension == ".pdf":
+        image = convertPDFtoJPG(imageFilePath)
+    else:
+        image = cv2.imread(imageFilePath)
+
     rescalingFactor = heightScaleFactor/image.shape[0] * 100
     paddedImage = addPaddingToImage(image, 100)
     canImage = applyCannySquareEdgeDetectionOnImage(
@@ -39,10 +57,10 @@ def ocrInterface(imageFilePath, heightScaleFactor, ocrLanguage,
 
     if showImages:
         cv2.drawContours(canImage, [ROI], -1, (255, 255, 255), 3)
+        cv2.imshow("Padded", paddedImage)
         cv2.imshow("Canny Edge", canImage)
         cv2.imshow("Warped", warpImage)
         cv2.imshow("Clean", cleanImage)
-        cv2.imshow("Padded", paddedImage)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
@@ -361,17 +379,23 @@ wdpath = '/Users/jenspedermeldgaard/Google Drive/CS/PythonProjects/OCR/'
 # Set IO Parameters
 inputDirectory = wdpath + 'images/'
 outputDirectory = wdpath + 'out/'
-allowedExtensions = tuple(('.jpg', '.jpeg', '.png'))
+allowedExtensions = tuple(('.jpg', '.jpeg', '.png', ".pdf"))
 
 # Pull File Details
 files = os.listdir(inputDirectory)
 files = [str.lower(f) for f in files]
 files = [f for f in files if f.endswith(allowedExtensions)]
 
-for f in files:
-    print("\n\nInitiating OCR on file " + f + "...")
-    inPath = inputDirectory + f
-    result = ocrInterface(inPath, 800, "dan", False, False, False)
-    outPath = outputDirectory + \
-        os.path.splitext(os.path.basename(f))[0] + ".csv"
-    result.to_csv(outPath, index=None, header=True)
+inPath = inputDirectory + files[2]
+result = ocrInterface(inPath, 800, "dan", False, False, False)
+outPath = outputDirectory + \
+    os.path.splitext(os.path.basename(inputDirectory + files[2]))[0] + ".csv"
+result.to_csv(outPath, index=None, header=True)
+
+# for f in files:
+#     print("\n\nInitiating OCR on file " + f + "...")
+#     inPath = inputDirectory + f
+#     result = ocrInterface(inPath, 800, "dan", False, False, False)
+#     outPath = outputDirectory + \
+#         os.path.splitext(os.path.basename(f))[0] + ".csv"
+#     result.to_csv(outPath, index=None, header=True)
