@@ -7,16 +7,20 @@ import pandas as pd
 import re
 import sys
 from PIL import Image
-from wand.image import Image as Img
+from pdf2image import convert_from_path
+import tempfile
 
 
 def convertPDFtoJPG(convertImageFilePath):
     fileDetails = os.path.split(convertImageFilePath)
-    filePath = fileDetails[0]
+    filePath = fileDetails[0] + "/"
     fileName = os.path.splitext(fileDetails[1])[0]
-    with Img(filename=convertImageFilePath, resolution=300) as img:
-        img.compression_quality = 99
-        img.save(filename=filePath+fileName+".jpg")
+    with tempfile.TemporaryDirectory() as path:
+        images_from_path = convert_from_path(
+            convertImageFilePath, output_folder=path,
+            last_page=1, first_page=0)
+    for page in images_from_path:
+        page.save(os.path.join(filePath, fileName + ".jpg"), 'JPEG')
     return cv2.imread(filePath+fileName+".jpg")
 
 
@@ -43,21 +47,25 @@ def ocrInterface(imageFilePath, heightScaleFactor, ocrLanguage,
 
     if fileExtension == ".pdf":
         image = convertPDFtoJPG(imageFilePath)
+        isPDF = True
     else:
         image = cv2.imread(imageFilePath)
+        isPDF = False
 
     rescalingFactor = heightScaleFactor/image.shape[0] * 100
-    paddedImage = addPaddingToImage(image, 100)
+    if not isPDF:
+        image = addPaddingToImage(image, 100)
+
     canImage = applyCannySquareEdgeDetectionOnImage(
-        paddedImage, rescalingFactor)
+        image, rescalingFactor)
     ROI = findLargestSquareOnCannyDetectedImage(canImage)
-    warpImage = getBirdView(paddedImage, ROI, rescalingFactor)
+    warpImage = getBirdView(image, ROI, rescalingFactor)
     cleanImage = cleanImageForOCR(warpImage)
     ocrResult = ocrEngine(cleanImage, ocrLanguage, printOcrLines)
 
     if showImages:
         cv2.drawContours(canImage, [ROI], -1, (255, 255, 255), 3)
-        cv2.imshow("Padded", paddedImage)
+        cv2.imshow("Padded", image)
         cv2.imshow("Canny Edge", canImage)
         cv2.imshow("Warped", warpImage)
         cv2.imshow("Clean", cleanImage)
@@ -386,16 +394,10 @@ files = os.listdir(inputDirectory)
 files = [str.lower(f) for f in files]
 files = [f for f in files if f.endswith(allowedExtensions)]
 
-inPath = inputDirectory + files[2]
-result = ocrInterface(inPath, 800, "dan", False, False, False)
-outPath = outputDirectory + \
-    os.path.splitext(os.path.basename(inputDirectory + files[2]))[0] + ".csv"
-result.to_csv(outPath, index=None, header=True)
-
-# for f in files:
-#     print("\n\nInitiating OCR on file " + f + "...")
-#     inPath = inputDirectory + f
-#     result = ocrInterface(inPath, 800, "dan", False, False, False)
-#     outPath = outputDirectory + \
-#         os.path.splitext(os.path.basename(f))[0] + ".csv"
-#     result.to_csv(outPath, index=None, header=True)
+for f in files:
+    print("\n\nInitiating OCR on file " + f + "...")
+    inPath = inputDirectory + f
+    result = ocrInterface(inPath, 800, "dan", False, False, False)
+    outPath = outputDirectory + \
+        os.path.splitext(os.path.basename(f))[0] + ".csv"
+    result.to_csv(outPath, index=None, header=True)
