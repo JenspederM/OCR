@@ -3,6 +3,7 @@ import os
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
+import pandas as pd
 
 
 # region Firestore Credentials
@@ -19,11 +20,16 @@ db = firestore.client()
 docs = db.collection(u'Foreninger').document(u'AACP').collection(
     u'Budget').document(u'2019').collection(u'BankStatements').stream()
 
-for doc in docs:
-    fsId = doc.id
-    fsDict = doc.to_dict()
-    print(u'{} => {}'.format(fsId, fsDict))
+bankStatements = pd.DataFrame(columns=('description', 'amount'))
 
+for doc in docs:
+    fsDict = doc.to_dict()
+    fsDict = {key: fsDict[key] for key in ('amount', 'description')}
+    bankStatements = bankStatements.append(fsDict, ignore_index=True)
+
+bankStatements = bankStatements[bankStatements['amount'] < 0]
+
+print(bankStatements)
 # endregion
 
 # # region Work Space
