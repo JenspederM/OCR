@@ -12,6 +12,16 @@ import tempfile
 
 
 def convertPDFtoJPG(convertImageFilePath):
+    """
+    ### Description:
+        Converts a PDF file to JPEG
+
+    ### Arguments:
+        convertImageFilePath {[String]} -- Filepath where from PDF is loaded.
+
+    ### Returns:
+        [cv2.Image] -- Loaded JPEG image
+    """
     fileDetails = os.path.split(convertImageFilePath)
     filePath = fileDetails[0] + "/"
     fileName = os.path.splitext(fileDetails[1])[0]
@@ -323,6 +333,7 @@ def pullPurchaseInfo(string):
 
     item = re.search(r'(\S+\ \S+|)(\S+\ )', string).group()
     item = re.sub(' ', '', item)
+    item = re.sub("'", "", item)
     price = re.search(r'(\d+(,|\.)\d\d)', string).group()
     price = re.sub(r'\.', '', price)
     price = re.sub(r',', '.', price)
