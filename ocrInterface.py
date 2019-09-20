@@ -1,10 +1,24 @@
 from waffleOCR.scannerFunctions import ocrInterface
+from waffleOCR.firestore import connectToFirestoreStorage
 from waffleOCR.firestore import grapBankStaments
+from waffleOCR.firestore import detect_text_uri
+from waffleOCR.firestore import explicit
 import os
 
+explicit()
 
-bankStatements = grapBankStaments()
-print(bankStatements)
+
+# bucket = connectToFirestoreStorage()
+# blobs = bucket.list_blobs()
+# blobpaths = []
+# for blob in blobs:
+#     blobpaths.append(blob.name)
+
+# print(blobpaths)
+
+
+# bankStatements = grapBankStaments()
+# print(bankStatements)
 
 # # region Work Space
 # # Set Working Directory
