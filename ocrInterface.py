@@ -2,17 +2,19 @@ from waffleOCR.scannerFunctions import ocrInterface
 from waffleOCR.firestore import connectToFirestoreStorage
 from waffleOCR.firestore import grapBankStaments
 from waffleOCR.firestore import detect_text_uri
-from waffleOCR.firestore import explicit
+
 import os
 
-explicit()
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = '/Users/jenspedermeldgaard/waffle-kasserer-creds.json'
+# Mangler "Enable Billing" --> Så skulle det gerne virke
+bucket = connectToFirestoreStorage()
+blobs = bucket.list_blobs()
+blobpaths = [blob.name for blob in blobs]
+storage_bucket = "gs://waffle-kasserer.appspot.com/"
 
 
-# bucket = connectToFirestoreStorage()
-# blobs = bucket.list_blobs()
-# blobpaths = []
-# for blob in blobs:
-#     blobpaths.append(blob.name)
+detect_text_uri(storage_bucket + blobpaths[0])
+
 
 # print(blobpaths)
 
